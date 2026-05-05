@@ -41,6 +41,7 @@ warehouse-system/
 │   │   ├── auth.js           # Login, Google sign-in, refresh, /me
 │   │   ├── products.js       # CRUD + paginated list
 │   │   ├── inventory.js      # List, receive stock, manual adjust, override
+│   │   ├── sales.js          # CRUD, invoice PDF, Smart Suggestions endpoint
 │   │   ├── alerts.js         # List, mark read, mark all read
 │   │   ├── admin.js          # Dashboard KPIs, user CRUD, sales report PDF
 │   │   ├── categories.js     # List + create
@@ -164,7 +165,7 @@ Schema lives in Neon; pushing code never touches data. To rebuild the DB from sc
 | GET | `/api/sales/:id` | Auth | Single sale with line items |
 | POST | `/api/sales` | Auth | Process a sale (atomic stock deduction) |
 | GET | `/api/sales/:id/invoice` | Auth | Download PDF invoice |
-
+| GET | `/api/sales/suggestions` | Auth | Smart Suggestions for cart products |
 | GET | `/api/alerts` | Auth | List alerts (filter by `?type=low|expiry`) |
 | PATCH | `/api/alerts/:id/read` | Auth | Mark single alert read |
 | PATCH | `/api/alerts/read-all` | Auth | Mark every alert read |
@@ -186,6 +187,7 @@ Schema lives in Neon; pushing code never touches data. To rebuild the DB from sc
 - **Role separation** — `authenticate` middleware verifies the JWT and populates `req.user`; `authorize('admin')` gates admin endpoints on top of that.
 - **Alert deduplication** — `ensureAlert()` upserts on (`inventory_id`, `type`, `is_read=false`) to prevent the cron job from spamming duplicate alerts.
 - **Daily expiry monitor** — `cronService.js` runs at 06:00 every day and once at boot, scanning for stock expiring within 30 days and items at/below their threshold.
+- **Smart Suggestions (AI)** — `/api/sales/suggestions` combines two layers: a SQL self-join over `sale_items` mining real co-purchase patterns, and a curated Lebanese-cuisine pairing engine (~30 rules) that fills in when sales history is sparse.
 - **Token refresh** — frontend `api.js` silently exchanges refresh tokens on 401, retrying the original request once before bouncing the user back to login.
 - **Pagination caps** — `/products` and `/inventory` accept up to 1000 rows per page so client-side category/search filters always have the full set.
 - **Rate limiting** — 100 req/15 min globally, 20 req/15 min on auth endpoints (skipped outside `NODE_ENV=production`).
