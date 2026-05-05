@@ -1,0 +1,34 @@
+const { Pool } = require('pg');
+const logger = require('./logger');
+
+if (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'test') {
+  throw new Error(
+    'DATABASE_URL is required. Copy backend/.env.example to backend/.env and set your connection string.'
+  );
+}
+
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    })
+  : null;
+
+if (pool) {
+  pool.on('error', (err) => logger.error(`PG pool error: ${err.message}`));
+}
+
+// Run a parameterised SQL query against the pool. Throws if no DATABASE_URL is set.
+async function query(text, values = []) {
+  if (!pool) throw new Error('DATABASE_URL is not configured.');
+  return pool.query(text, values);
+}
+
+// Smoke-test the database connection at startup with a trivial SELECT.
+async function testConnection() {
+  if (!pool) return false;
+  await pool.query('SELECT 1');
+  return true;
+}
+
+module.exports = { pool, query, testConnection };
